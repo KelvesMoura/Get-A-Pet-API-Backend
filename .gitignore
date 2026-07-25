@@ -1,0 +1,14 @@
+#Node Modules
+/node_modules/
+
+# System Files (Windows e Mac)
+.DS_Store
+thumbs.db
+desktop.ini
+init/
+
+# Logs and temporary files
+.vscode/
+
+# Environment Variables
+.env

@@ -1,0 +1,18 @@
+services:
+  # Node
+  node:
+    build: .
+    container_name: nodejs
+    working_dir: /usr/src/app
+    env_file:
+      - .env
+
+  #MongoDB Database
+  mongodb:
+    image: mongodb/mongodb-atlas-local:latest
+    container_name: mongoDB
+
+volumes:
+  db:
+  configdb:
+  mongot:

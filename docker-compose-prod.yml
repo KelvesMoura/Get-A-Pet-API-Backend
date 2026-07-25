@@ -1,0 +1,7 @@
+services:
+  node:
+    restart: always
+    command: npm run server.js
+
+  mongodb:
+    restart: always

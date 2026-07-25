@@ -1,0 +1,38 @@
+services:
+  node:
+    volumes:
+      - .:/usr/src/app # Ativa a ponte em tempo real com o VS Code
+    stdin_open: true
+    tty: true
+    command: sleep infinity
+    ports:
+      - "${BACK_PORT_HOST}:5000"
+
+  mongodb:
+    hostname: ${MONGO_HOST}
+    environment:
+      - MONGODB_INIT_USERNAME=${MONGO_USER}
+      - MONGODB_INIT_PASSWORD=${MONGO_USER_PASS}
+    ports:
+      - ${MONGO_PORT}:27017
+    volumes:
+      - ./init:/docker-entrypoint-initdb.d
+      - db:/data/db
+      - configdb:/data/configdb
+      - mongot:/var/lib/data/mongot
+
+  # Mongo Express
+  mongo-express:
+    image: mongo-express:latest
+    container_name: mongo_express
+    restart: always
+    ports:
+      - "${MONGOEXP_PORT}:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=${MONGO_HOST}
+      - ME_CONFIG_MONGODB_PORT=${MONGO_PORT}
+      - ME_CONFIG_BASICAUTH_USERNAME=${MONGOEXP_USER}
+      - ME_CONFIG_BASICAUTH_PASSWORD=${MONGOEXP_USER_PASS}
+    depends_on:
+      - mongodb
+      - node
