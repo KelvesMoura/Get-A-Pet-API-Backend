@@ -36,11 +36,11 @@ Get A Pet is a pure JSON API (no server-rendered views) designed to sit behind a
 Core features:
 
 - User registration with field validation, password-confirmation check, and duplicate-email protection
-- Login with hashed-password verification and JWT issuance
+- Login with hashed-password verification and JWT issuance; logout clears the session cookie server-side
 - `checkuser` endpoint to silently validate the current session from the cookie
-- Full pet lifecycle: create, list (paginated), fetch by id, edit, delete
-- Adoption workflow: schedule a visit (`/pets/schedule/:id`) and finalize adoption (`/pets/petadopted/:id`), with ownership checks preventing users from adopting or editing their own pets
-- Image uploads for user avatars and pet photos, stored per-entity under `public/images/`
+- Full pet lifecycle: create, list (paginated), fetch by id, edit (appending new photos), delete individual photos, delete the whole listing
+- Adoption workflow: schedule a visit, cancel a scheduled visit, and toggle the adoption outcome (`/pets/petadopted/:id`) — with ownership checks preventing users from adopting or editing their own pets
+- Image uploads for user avatars and pet photos, stored per-entity under `public/images/`, with request body limits raised to comfortably handle image payloads
 
 ---
 
@@ -88,6 +88,7 @@ Get-A-Pet/
 │   │   ├── get-token.js          ← extracts the token from the request cookie
 │   │   ├── get-user-by-token.js  ← resolves the authenticated User from a token
 │   │   ├── verify-token.js       ← route-protection middleware
+│   │   ├── clear-token.js        ← clears the auth cookie on logout
 │   │   └── image-upload.js       ← Multer disk-storage configuration
 │   ├── models/
 │   │   ├── User.js
@@ -116,7 +117,7 @@ The API follows a lightweight **layered structure** on top of Express, without s
 | **Routes**        | Express routers mapping HTTP verbs/paths to controller methods, wiring in middleware (`verifyToken`, `imageUpload`) |
 | **Helpers**       | Cross-cutting concerns reused across controllers: token creation, token parsing, user resolution, upload configuration |
 
-`server.js` wires everything together: it configures `express.json()`, serves `public/` as static assets, applies a strict CORS policy scoped to `URL_FRONT` with `credentials: true` (required for cookies to be sent cross-origin), registers `cookie-parser`, and mounts the `/users` and `/pets` routers.
+`server.js` wires everything together: it configures `express.json({ limit: "5mb" })` and `express.urlencoded({ extended: true, limit: "5mb" })` (raised to comfortably accommodate image-carrying requests), serves `public/` as static assets, applies a strict CORS policy scoped to `URL_FRONT` with `credentials: true` (required for cookies to be sent cross-origin) and explicit `allowedHeaders`, registers `cookie-parser`, and mounts the `/users` and `/pets` routers.
 
 ---
 
@@ -142,9 +143,15 @@ Authentication here is intentionally split into two independent responsibilities
 - `helpers/verify-token.js` is the **route-protection middleware**: it extracts the token, rejects the request with `401` if none is present, and otherwise calls `jwt.verify(token, JWT_SECRET)`. An invalid or tampered token returns `400`; a valid one attaches the decoded payload to `req.user` and calls `next()`.
 - `helpers/get-user-by-token.js` goes one step further than `verifyToken`: it verifies the token **and** resolves the full `User` document from the database via the decoded `id`, so controllers can act on the actual authenticated user (e.g. checking pet ownership) rather than just the token payload.
 - `verifyToken` is applied selectively at the route level (`UserRoutes.js`, `PetRoutes.js`) on every mutating or user-scoped endpoint — registration, login, and the public pet listing remain open, while editing a profile, creating/editing/deleting a pet, and the adoption flow all require a valid session.
-- `UserController.checkUser` provides a lightweight "who am I" endpoint: if an `access_token` cookie is present, it verifies it and returns the current user (password stripped); otherwise it returns `null`, letting the front-end silently determine login state.
+- `UserController.checkUser` provides a lightweight "who am I" endpoint: if an `access_token` cookie is present, it verifies it and returns a minimal confirmation (`{ message, id }`) rather than the full user document; otherwise it returns `null`, letting the front-end silently determine login state without over-exposing user data.
 
-### 4. Secrets & configuration
+### 4. Logout
+
+- `helpers/clear-token.js` is a dedicated helper that clears the session by calling `res.clearCookie("access_token", ...)` with **the exact same flags used when the cookie was set** (`httpOnly`, `secure` from `COOKIE_SECURE`, `sameSite: "lax"`, `path: "/"`) — mismatched flags are a common bug that silently fails to clear cookies in the browser, so this keeps both operations in sync.
+- `UserController.logout` invokes this helper and responds with a `Cache-Control: no-store` header to prevent the now-invalidated session from being served out of any cache.
+- Exposed at `GET /users/logout`.
+
+### 5. Secrets & configuration
 
 - `JWT_SECRET`, MongoDB credentials, and cookie settings are read exclusively from environment variables via `dotenv` — never hardcoded.
 - Only `env.exemple` (placeholder values) is version-controlled; the real `.env` is excluded via `.gitignore` and `.dockerignore`.
@@ -170,7 +177,7 @@ Authentication here is intentionally split into two independent responsibilities
 | `User` | `name`, `email`, `password` (hash), `image`, `phone`                    | Referenced by `Pet.user` and `Pet.adopter`         |
 | `Pet`  | `name`, `age`, `weight`, `color`, `images[]`, `available`, `user`, `adopter` | Embeds a snapshot of the owning `User` and, once scheduled, the adopting `User` |
 
-`Pet.user` and `Pet.adopter` store a denormalized snapshot (`_id`, `name`, `image`, `phone`) of the related user rather than a Mongoose `ref`, so pet listings don't require a separate population query.
+`Pet.user` and `Pet.adopter` store a denormalized snapshot (`_id`, `name`, `image`, `phone`) of the related user rather than a Mongoose `ref`, so pet listings don't require a separate population query. `Pet.available` defaults to `true` on creation, so a newly listed pet is immediately open for adoption without extra client-side logic.
 
 ---
 
@@ -182,9 +189,10 @@ Authentication here is intentionally split into two independent responsibilities
 | ------ | -------------- | :-----------: | ------------------------ | ------------------------------------------------ |
 | POST   | `/register`    |      No       | `UserController.create`  | Registers a user, hashes the password, issues a JWT |
 | POST   | `/login`       |      No       | `UserController.login`   | Verifies credentials with bcrypt, issues a JWT |
-| GET    | `/checkuser`   |      No*      | `UserController.checkUser` | Resolves the current user from the cookie, if any |
+| GET    | `/checkuser`   |      No*      | `UserController.checkUser` | Resolves the current session from the cookie, if any |
 | GET    | `/:id`         |      No       | `UserController.getUserById` | Fetches a user by id (password excluded)   |
 | PATCH  | `/edit/:id`    |    **Yes**    | `UserController.editUser` | Updates profile data, optionally re-hashing a new password and replacing the avatar |
+| GET    | `/logout`      |      No       | `UserController.logout`  | Clears the `access_token` cookie, ending the session |
 
 ### Pets (`/pets`)
 
@@ -196,9 +204,11 @@ Authentication here is intentionally split into two independent responsibilities
 | GET    | `/myadoptions`        |    **Yes**    | `PetController.getPetsAdopted`  | Paginated list of pets the current user has scheduled/adopted |
 | GET    | `/:id`                |      No       | `PetController.getPetById`      | Fetches a single pet by id                         |
 | DELETE | `/delete/:id`         |    **Yes**    | `PetController.deletePetById`   | Deletes a pet (owner-only)                         |
-| PATCH  | `/edit/:id`           |    **Yes**    | `PetController.editPet`         | Updates a pet's data and photos (owner-only)       |
+| PATCH  | `/edit/:id`           |    **Yes**    | `PetController.editPet`         | Updates a pet's data; new photos are appended to the existing ones instead of overwriting them (owner-only) |
+| PATCH  | `/edit/images/:id`    |    **Yes**    | `PetController.deleteImage`     | Removes a single photo from a pet, deleting the file from disk and pulling it from `images[]` (owner-only) |
 | PATCH  | `/schedule/:id`       |    **Yes**    | `PetController.schedule`        | Schedules an adoption visit (blocks self-adoption and duplicate scheduling) |
-| PATCH  | `/petadopted/:id`     |    **Yes**    | `PetController.petAdopted`      | Marks the pet as no longer available (owner-only)  |
+| PATCH  | `/cancelschedule/:id` |    **Yes**    | `PetController.cancelSchedule`  | Cancels a scheduled visit, removing the `adopter` reference (owner or the scheduled adopter only) |
+| PATCH  | `/petadopted/:id`     |    **Yes**    | `PetController.petAdopted`      | Toggles `available` via `{ available }` in the body — finalizes the adoption or releases the pet back for adoption (owner-only) |
 
 \* `checkuser` doesn't reject unauthenticated requests — it simply returns `null` when no valid cookie is present.
 

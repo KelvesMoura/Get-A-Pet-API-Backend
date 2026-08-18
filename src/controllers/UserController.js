@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const createUserToken = require("../helpers/create-user-token");
 const getToken = require("../helpers/get-token");
+const clearToken = require("../helpers/clear-token");
 const getUserByToken = require("../helpers/get-user-by-token");
 
 const User = require("../models/User");
@@ -117,12 +118,12 @@ module.exports = class HomeController {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
         currentUser = await User.findById(decoded.id);
-
-        currentUser.password = undefined;
       } else {
         currentUser = null;
       }
-      res.status(200).send(currentUser);
+      res
+        .status(200)
+        .json({ message: "Usuário Autenticado", id: currentUser._id });
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" });
     }
@@ -215,6 +216,14 @@ module.exports = class HomeController {
       );
 
       res.status(200).json({ message: "Usuário Atualizado com Sucesso!" });
+    } catch (err) {
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  }
+
+  static async logout(req, res) {
+    try {
+      await clearToken(res);
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" });
     }

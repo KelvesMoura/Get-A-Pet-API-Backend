@@ -12,14 +12,15 @@ const PetRoutes = require("./src/routes/PetRoutes");
 const app = express();
 const port = process.env.BACK_PORT_HOST;
 
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 const corsOptions = {
   origin: process.env.URL_FRONT,
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Typer"],
+  allowedHeaders: ["Content-type"],
 };
 
 app.use(cors(corsOptions));

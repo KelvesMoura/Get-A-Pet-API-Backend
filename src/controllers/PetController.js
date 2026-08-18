@@ -1,5 +1,7 @@
 const mongoose = require("mongoose");
 const Pet = require("../models/Pet");
+const fs = require("fs/promises");
+const path = require("path");
 
 const getToken = require("../helpers/get-token");
 const getUserByToken = require("../helpers/get-user-by-token");
@@ -182,7 +184,7 @@ module.exports = class PetController {
       if (user._id.toString() !== pet.user._id) {
         res.status(422).json({
           message:
-            "Erro ao processar sua solicitação, tente mais novamente mais tarde",
+            "Erro ao processar sua solicitação, tente novamente mais tarde",
         });
         return;
       }
@@ -227,7 +229,7 @@ module.exports = class PetController {
       if (user._id.toString() !== pet.user._id) {
         return res.status(422).json({
           message:
-            "Erro ao processar sua solicitação, tente mais novamente mais tarde",
+            "Erro ao processar sua solicitação, tente novamente mais tarde",
         });
       }
 
@@ -240,20 +242,23 @@ module.exports = class PetController {
         updatedData[campo] = req.body[campo];
       }
 
-      if (images.length === 0) {
+      if (images.length === 0 && pet.images.length === 0) {
         return res
           .status(422)
           .json({ message: "O campo de imagem é obrigatória!" });
-      } else {
-        updatedData.images = [];
-        images.map((image) => updatedData.images.push(image.filename));
+      }
+
+      updatedData.images = pet.images;
+
+      if (images.length > 0) {
+        images.forEach((image) => updatedData.images.push(image.filename));
       }
 
       await Pet.findByIdAndUpdate(id, updatedData);
 
       res
         .status(200)
-        .json({ message: "Pet autalizado com sucesso", pet: updatedData });
+        .json({ message: "Pet atualizado com sucesso", pet: updatedData });
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" });
     }
@@ -276,14 +281,14 @@ module.exports = class PetController {
 
       if (user._id.toString() === pet.user._id) {
         return res.status(422).json({
-          message: "Você não pode agendar uma visita para o próprio Pet",
+          message: "Você não pode agendar uma visita para o próprio Pet!",
         });
       }
 
       if (pet.adopter) {
         if (pet.adopter._id === user.id) {
           return res.status(422).json({
-            message: "Você já agendou uma visita para este Pet",
+            message: "Você já agendou uma visita para este Pet!",
           });
         }
       }
@@ -296,16 +301,54 @@ module.exports = class PetController {
       await Pet.findByIdAndUpdate(id, pet);
 
       res.status(200).json({
-        message: `Agendamento realizado com sucesso, entre em contato com ${pet.user.name} pelo telefone ${pet.user.phone}`,
+        message: `Agendamento realizado com sucesso! Entre em contato com ${pet.user.name} pelo telefone ${pet.user.phone}`,
       });
     } catch (err) {
-      res.status(500).json({ message: "Erro no servidor" + err });
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  }
+
+  static async cancelSchedule(req, res) {
+    try {
+      const { id } = req.params;
+
+      const pet = await Pet.findById(id);
+
+      if (!pet) {
+        return res.status(404).json({
+          message: "Pet não encontrado",
+        });
+      }
+
+      const token = getToken(req);
+      const user = await getUserByToken(token);
+
+      if (pet.adopter) {
+        if (pet.adopter._id !== user.id && pet.user._id !== user.id) {
+          return res.status(422).json({
+            message: "Você não pode cancelar a visita de outro usuário!",
+          });
+        }
+      }
+
+      await Pet.findByIdAndUpdate(
+        id,
+        { $unset: { adopter: "" } },
+        { new: true },
+      );
+
+      res.status(200).json({
+        message: `Agendamento cancelado com sucesso!`,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Erro no servidor" });
     }
   }
 
   static async petAdopted(req, res) {
     try {
       const { id } = req.params;
+      const { available } = req.body;
 
       const pet = await Pet.findById(id);
 
@@ -321,16 +364,68 @@ module.exports = class PetController {
       if (user._id.toString() !== pet.user._id) {
         return res.status(422).json({
           message:
-            "Erro ao processar sua solicitação, tente mais novamente mais tarde",
+            "Erro ao processar sua solicitação, tente novamente mais tarde",
         });
       }
 
-      pet.available = false;
+      let message = "";
+
+      !available
+        ? (message = "Parabéns, processo de adoção finalizado com sucesso!")
+        : (message = "Pet liberado para adoção!");
+
+      pet.available = available;
 
       await Pet.findByIdAndUpdate(id, pet);
 
       res.status(200).json({
-        message: "Parabéns, processo de adoção finalizado com sucesso!",
+        message: message,
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Erro no servidor" });
+    }
+  }
+
+  static async deleteImage(req, res) {
+    try {
+      const { id } = req.params;
+
+      const { id_photo } = req.body;
+
+      const token = getToken(req);
+      const user = await getUserByToken(token);
+
+      const pet = await Pet.findById(id);
+
+      if (!pet) {
+        return res.status(404).json({
+          message: "Pet não encontrado",
+        });
+      }
+
+      if (user._id.toString() !== pet.user._id) {
+        return res.status(422).json({
+          message:
+            "Erro ao processar sua solicitação, tente novamente mais tarde",
+        });
+      }
+
+      const imagePath = path.join(
+        __dirname,
+        "..",
+        "..",
+        "public",
+        "images",
+        "pets",
+        `${id_photo}`,
+      );
+
+      await fs.unlink(imagePath);
+
+      await Pet.findByIdAndUpdate(id, { $pull: { images: id_photo } });
+
+      res.status(200).json({
+        message: "Imagem removida com sucesso!",
       });
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" + err });
