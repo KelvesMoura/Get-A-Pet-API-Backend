@@ -14,7 +14,7 @@ RUN npm install --omit=dev
 COPY . .
 
 # Expõe a porta que o Express está ouvindo
-EXPOSE 3000
+EXPOSE 5000
 
 # Comando que inicia o servidor em produção
 CMD ["node", "server.js"]

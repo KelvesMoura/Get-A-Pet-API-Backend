@@ -1,4 +1,4 @@
-# 🐾 Get A Pet — API & JWT Authentication
+# 🐾 Get A Pet — API - Back-end
 
 A **RESTful API** built with **Node.js**, **Express**, and **MongoDB (Mongoose)** for a pet-adoption platform. Users can register, authenticate, list pets for adoption, schedule visits, and complete adoptions. Authentication is fully **stateless and token-based**, combining **bcrypt** for password hashing with **JWT (JSON Web Tokens)** for session verification — no server-side session store is used. The API is decoupled from any front-end (CORS-restricted to a single trusted origin) and fully containerized with **Docker**.
 
@@ -46,21 +46,21 @@ Core features:
 
 ## Tech Stack
 
-| Layer               | Technology                          |
-| -------------------- | ------------------------------------ |
-| Runtime              | Node.js (Alpine, containerized)     |
-| Web Framework         | Express 5                           |
-| Database             | MongoDB                             |
-| ODM                   | Mongoose                            |
-| Password Hashing      | bcrypt                              |
-| Authentication        | jsonwebtoken (JWT)                  |
-| Cookie Handling       | cookie-parser                       |
-| File Uploads          | Multer                              |
-| Cross-Origin Requests | cors                                 |
-| Environment Config    | dotenv                              |
-| Containerization      | Docker + Docker Compose             |
+| Layer                 | Technology                                     |
+| --------------------- | ---------------------------------------------- |
+| Runtime               | Node.js (Alpine, containerized)                |
+| Web Framework         | Express 5                                      |
+| Database              | MongoDB                                        |
+| ODM                   | Mongoose                                       |
+| Password Hashing      | bcrypt                                         |
+| Authentication        | jsonwebtoken (JWT)                             |
+| Cookie Handling       | cookie-parser                                  |
+| File Uploads          | Multer                                         |
+| Cross-Origin Requests | cors                                           |
+| Environment Config    | dotenv                                         |
+| Containerization      | Docker + Docker Compose                        |
 | Local DB Admin        | Mongo Express (dev-only, via Compose override) |
-| Dev Tooling           | nodemon                             |
+| Dev Tooling           | nodemon                                        |
 
 ---
 
@@ -110,12 +110,12 @@ Get-A-Pet/
 
 The API follows a lightweight **layered structure** on top of Express, without server-side views:
 
-| Layer           | Responsibility                                                                 |
-| ---------------- | -------------------------------------------------------------------------------- |
-| **Models**        | Mongoose schemas for `User` and `Pet`                                          |
-| **Controllers**   | Business logic per domain — user auth/profile, pet CRUD and adoption flow     |
-| **Routes**        | Express routers mapping HTTP verbs/paths to controller methods, wiring in middleware (`verifyToken`, `imageUpload`) |
-| **Helpers**       | Cross-cutting concerns reused across controllers: token creation, token parsing, user resolution, upload configuration |
+| Layer           | Responsibility                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Models**      | Mongoose schemas for `User` and `Pet`                                                                                  |
+| **Controllers** | Business logic per domain — user auth/profile, pet CRUD and adoption flow                                              |
+| **Routes**      | Express routers mapping HTTP verbs/paths to controller methods, wiring in middleware (`verifyToken`, `imageUpload`)    |
+| **Helpers**     | Cross-cutting concerns reused across controllers: token creation, token parsing, user resolution, upload configuration |
 
 `server.js` wires everything together: it configures `express.json({ limit: "5mb" })` and `express.urlencoded({ extended: true, limit: "5mb" })` (raised to comfortably accommodate image-carrying requests), serves `public/` as static assets, applies a strict CORS policy scoped to `URL_FRONT` with `credentials: true` (required for cookies to be sent cross-origin) and explicit `allowedHeaders`, registers `cookie-parser`, and mounts the `/users` and `/pets` routers.
 
@@ -123,7 +123,7 @@ The API follows a lightweight **layered structure** on top of Express, without s
 
 ## Authentication & Security — bcrypt + JWT
 
-Authentication here is intentionally split into two independent responsibilities: **bcrypt** answers *"is this the right password?"*, and **JWT** answers *"is this request coming from an already-authenticated user?"* on every subsequent call.
+Authentication here is intentionally split into two independent responsibilities: **bcrypt** answers _"is this the right password?"_, and **JWT** answers _"is this request coming from an already-authenticated user?"_ on every subsequent call.
 
 ### 1. Password hashing with bcrypt
 
@@ -172,9 +172,9 @@ Authentication here is intentionally split into two independent responsibilities
 
 ## Data Models
 
-| Model  | Fields                                                                 | Relationship                                       |
-| ------ | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `User` | `name`, `email`, `password` (hash), `image`, `phone`                    | Referenced by `Pet.user` and `Pet.adopter`         |
+| Model  | Fields                                                                       | Relationship                                                                    |
+| ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `User` | `name`, `email`, `password` (hash), `image`, `phone`                         | Referenced by `Pet.user` and `Pet.adopter`                                      |
 | `Pet`  | `name`, `age`, `weight`, `color`, `images[]`, `available`, `user`, `adopter` | Embeds a snapshot of the owning `User` and, once scheduled, the adopting `User` |
 
 `Pet.user` and `Pet.adopter` store a denormalized snapshot (`_id`, `name`, `image`, `phone`) of the related user rather than a Mongoose `ref`, so pet listings don't require a separate population query. `Pet.available` defaults to `true` on creation, so a newly listed pet is immediately open for adoption without extra client-side logic.
@@ -185,30 +185,30 @@ Authentication here is intentionally split into two independent responsibilities
 
 ### Users (`/users`)
 
-| Method | Route          | Auth required | Controller              | Description                                    |
-| ------ | -------------- | :-----------: | ------------------------ | ------------------------------------------------ |
-| POST   | `/register`    |      No       | `UserController.create`  | Registers a user, hashes the password, issues a JWT |
-| POST   | `/login`       |      No       | `UserController.login`   | Verifies credentials with bcrypt, issues a JWT |
-| GET    | `/checkuser`   |      No*      | `UserController.checkUser` | Resolves the current session from the cookie, if any |
-| GET    | `/:id`         |      No       | `UserController.getUserById` | Fetches a user by id (password excluded)   |
-| PATCH  | `/edit/:id`    |    **Yes**    | `UserController.editUser` | Updates profile data, optionally re-hashing a new password and replacing the avatar |
-| GET    | `/logout`      |      No       | `UserController.logout`  | Clears the `access_token` cookie, ending the session |
+| Method | Route        | Auth required | Controller                   | Description                                                                         |
+| ------ | ------------ | :-----------: | ---------------------------- | ----------------------------------------------------------------------------------- |
+| POST   | `/register`  |      No       | `UserController.create`      | Registers a user, hashes the password, issues a JWT                                 |
+| POST   | `/login`     |      No       | `UserController.login`       | Verifies credentials with bcrypt, issues a JWT                                      |
+| GET    | `/checkuser` |     No\*      | `UserController.checkUser`   | Resolves the current session from the cookie, if any                                |
+| GET    | `/:id`       |      No       | `UserController.getUserById` | Fetches a user by id (password excluded)                                            |
+| PATCH  | `/edit/:id`  |    **Yes**    | `UserController.editUser`    | Updates profile data, optionally re-hashing a new password and replacing the avatar |
+| GET    | `/logout`    |      No       | `UserController.logout`      | Clears the `access_token` cookie, ending the session                                |
 
 ### Pets (`/pets`)
 
-| Method | Route                 | Auth required | Controller                     | Description                                       |
-| ------ | --------------------- | :-----------: | -------------------------------- | ---------------------------------------------------- |
-| POST   | `/create`             |    **Yes**    | `PetController.create`          | Creates a pet listing with uploaded images         |
-| GET    | `/`                   |      No       | `PetController.getAll`          | Paginated list of all pets available for adoption |
-| GET    | `/mypets`             |    **Yes**    | `PetController.getMyPets`       | Paginated list of pets owned by the current user   |
-| GET    | `/myadoptions`        |    **Yes**    | `PetController.getPetsAdopted`  | Paginated list of pets the current user has scheduled/adopted |
-| GET    | `/:id`                |      No       | `PetController.getPetById`      | Fetches a single pet by id                         |
-| DELETE | `/delete/:id`         |    **Yes**    | `PetController.deletePetById`   | Deletes a pet (owner-only)                         |
-| PATCH  | `/edit/:id`           |    **Yes**    | `PetController.editPet`         | Updates a pet's data; new photos are appended to the existing ones instead of overwriting them (owner-only) |
-| PATCH  | `/edit/images/:id`    |    **Yes**    | `PetController.deleteImage`     | Removes a single photo from a pet, deleting the file from disk and pulling it from `images[]` (owner-only) |
-| PATCH  | `/schedule/:id`       |    **Yes**    | `PetController.schedule`        | Schedules an adoption visit (blocks self-adoption and duplicate scheduling) |
-| PATCH  | `/cancelschedule/:id` |    **Yes**    | `PetController.cancelSchedule`  | Cancels a scheduled visit, removing the `adopter` reference (owner or the scheduled adopter only) |
-| PATCH  | `/petadopted/:id`     |    **Yes**    | `PetController.petAdopted`      | Toggles `available` via `{ available }` in the body — finalizes the adoption or releases the pet back for adoption (owner-only) |
+| Method | Route                 | Auth required | Controller                     | Description                                                                                                                     |
+| ------ | --------------------- | :-----------: | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/create`             |    **Yes**    | `PetController.create`         | Creates a pet listing with uploaded images                                                                                      |
+| GET    | `/`                   |      No       | `PetController.getAll`         | Paginated list of all pets available for adoption                                                                               |
+| GET    | `/mypets`             |    **Yes**    | `PetController.getMyPets`      | Paginated list of pets owned by the current user                                                                                |
+| GET    | `/myadoptions`        |    **Yes**    | `PetController.getPetsAdopted` | Paginated list of pets the current user has scheduled/adopted                                                                   |
+| GET    | `/:id`                |      No       | `PetController.getPetById`     | Fetches a single pet by id                                                                                                      |
+| DELETE | `/delete/:id`         |    **Yes**    | `PetController.deletePetById`  | Deletes a pet (owner-only)                                                                                                      |
+| PATCH  | `/edit/:id`           |    **Yes**    | `PetController.editPet`        | Updates a pet's data; new photos are appended to the existing ones instead of overwriting them (owner-only)                     |
+| PATCH  | `/edit/images/:id`    |    **Yes**    | `PetController.deleteImage`    | Removes a single photo from a pet, deleting the file from disk and pulling it from `images[]` (owner-only)                      |
+| PATCH  | `/schedule/:id`       |    **Yes**    | `PetController.schedule`       | Schedules an adoption visit (blocks self-adoption and duplicate scheduling)                                                     |
+| PATCH  | `/cancelschedule/:id` |    **Yes**    | `PetController.cancelSchedule` | Cancels a scheduled visit, removing the `adopter` reference (owner or the scheduled adopter only)                               |
+| PATCH  | `/petadopted/:id`     |    **Yes**    | `PetController.petAdopted`     | Toggles `available` via `{ available }` in the body — finalizes the adoption or releases the pet back for adoption (owner-only) |
 
 \* `checkuser` doesn't reject unauthenticated requests — it simply returns `null` when no valid cookie is present.
 
@@ -218,13 +218,13 @@ Authentication here is intentionally split into two independent responsibilities
 
 The project ships with three Compose files for different contexts:
 
-| File                          | Purpose                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `docker-compose.yml`           | Base services: Node.js app + MongoDB (`mongodb-atlas-local` image)                                     |
-| `docker-compose.override.yml`  | Local development overrides — live volume mount for hot-reload, exposed Node/Mongo ports, and a `mongo-express` service for visual DB management |
-| `docker-compose-prod.yml`      | Production overrides — `restart: always` policies for both services                                    |
+| File                          | Purpose                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `docker-compose.yml`          | Base services: Node.js app + MongoDB (`mongodb-atlas-local` image)                                                                               |
+| `docker-compose.override.yml` | Local development overrides — live volume mount for hot-reload, exposed Node/Mongo ports, and a `mongo-express` service for visual DB management |
+| `docker-compose-prod.yml`     | Production overrides — `restart: always` policies for both services                                                                              |
 
-The `dockerfile` builds a lightweight `node:24-alpine` image, installs only production dependencies (`npm install --omit=dev`), exposes port `3000`, and starts the app with `node server.js`.
+The `dockerfile` builds a lightweight `node:24-alpine` image, installs only production dependencies (`npm install --omit=dev`), exposes port `5000`, and starts the app with `node server.js`.
 
 ---
 
