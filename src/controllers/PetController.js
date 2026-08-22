@@ -58,7 +58,7 @@ module.exports = class PetController {
 
       const newPet = await pet.save();
 
-      res.status(201).json({ message: "Pet criado com sucesoo", newPet });
+      res.status(201).json({ message: "Pet criado com sucesso", newPet });
     } catch (err) {
       res.status(500).json({ message: "Erro no servidor" });
     }

@@ -1,5 +1,6 @@
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 const imageStore = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -10,7 +11,12 @@ const imageStore = multer.diskStorage({
     } else if (req.baseUrl.includes("pets")) {
       folder = "pets";
     }
-    cb(null, `public/images/${folder}`);
+
+    const destPath = `public/images/${folder}`;
+
+    fs.mkdirSync(destPath, { recursive: true });
+
+    cb(null, destPath);
   },
   filename: function (req, file, cb) {
     //Utilizado para criar um sufix diferente, em caso de subir multiples files
