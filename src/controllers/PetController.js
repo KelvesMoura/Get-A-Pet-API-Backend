@@ -67,7 +67,7 @@ module.exports = class PetController {
   static async getAll(req, res) {
     try {
       const page = parseInt(req.query.page) || 1;
-      const limit = 10;
+      const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
       const pets = await Pet.find().sort("-createdAt").skip(skip).limit(limit);
@@ -88,7 +88,7 @@ module.exports = class PetController {
       const user = await getUserByToken(token);
 
       const page = parseInt(req.query.page) || 1;
-      const limit = 10;
+      const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
       const pets = await Pet.find({ "user._id": `${user._id}` })
@@ -113,7 +113,7 @@ module.exports = class PetController {
       const user = await getUserByToken(token);
 
       const page = parseInt(req.query.page) || 1;
-      const limit = 10;
+      const limit = parseInt(req.query.limit) || 10;
       const skip = (page - 1) * limit;
 
       const pets = await Pet.find({ "adopter._id": `${user._id}` })
