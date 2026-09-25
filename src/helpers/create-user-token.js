@@ -12,7 +12,7 @@ const createUserToken = async (user, req, res) => {
 
   res.cookie("access_token", token, {
     httpOnly: true,
-    secure: process.env.COOKIE_SECURE,
+    secure: process.env.COOKIE_SECURE === "production",
     sameSite: "lax",
     maxAge: 3600000,
   });
